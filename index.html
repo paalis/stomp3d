@@ -66,7 +66,7 @@ input[type=range] { width: 100%; accent-color: var(--focus); min-height: 36px; }
 
 <header>
   <h1>SPD::ONE KICK Footstand</h1>
-  <p class="sub">Holder 151 × 182 × 38 mm &nbsp;·&nbsp; hælplate 151 × 190 × 19 mm &nbsp;·&nbsp; v7 (tegnet grafikk på pedalen)</p>
+  <p class="sub">Holder 151 × 182 × 38 mm &nbsp;·&nbsp; hælplate 151 × 190 × 19 mm &nbsp;·&nbsp; v7b (tegnet grafikk på pedalen)</p>
 </header>
 
 <div id="stage"><div class="hint">Dra for å dreie · klyp eller rull for å zoome · to fingre for å flytte</div></div>
@@ -87,6 +87,7 @@ input[type=range] { width: 100%; accent-color: var(--focus); min-height: 36px; }
   <div class="grp">
     <span class="lbl">Fastholding</span>
     <button type="button" class="tog" id="hooks" aria-pressed="false">Marker bakre stopp og snaplist</button>
+    <button type="button" class="tog" id="dims" aria-pressed="false">Vis mål (mm)</button>
   </div>
   <div class="grp">
     <span class="lbl">Kamera</span>
@@ -184,6 +185,57 @@ input[type=range] { width: 100%; accent-color: var(--focus); min-height: 36px; }
     var dm = new THREE.MeshStandardMaterial({ map: tx, roughness: 0.5, metalness: 0, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
     var mesh = new THREE.Mesh(g, dm); mesh.receiveShadow = true;
     gPedal.add(mesh);
+  })();
+  // ---- mållinjer (vises med knappen "Vis mål") ----
+  (function () {
+    function V(x, y, z) { return new THREE.Vector3(x, z, -y); }          // modell (x,y,z) -> tre.js
+    var lineMat = new THREE.LineBasicMaterial({ color: 0x1f5fd1, depthTest: false, transparent: true });
+    function label(txt) {
+      var c = document.createElement('canvas'); c.width = 384; c.height = 96;
+      var g = c.getContext('2d');
+      g.fillStyle = 'rgba(255,255,255,0.94)'; g.strokeStyle = '#1f5fd1'; g.lineWidth = 5;
+      g.beginPath(); g.rect(4, 4, 376, 88); g.fill(); g.stroke();
+      g.fillStyle = '#12306b'; g.font = 'bold 50px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillText(txt, 192, 50);
+      var sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false, transparent: true }));
+      sp.scale.set(44, 11, 1); sp.renderOrder = 20; return sp;
+    }
+    function dim(grp, a, b, txt, tick, lo) {
+      var pts = [V(a[0], a[1], a[2]), V(b[0], b[1], b[2])];
+      var geo = new THREE.BufferGeometry().setFromPoints(pts);
+      var ln = new THREE.Line(geo, lineMat); ln.renderOrder = 19; grp.add(ln);
+      [a, b].forEach(function (p) {
+        var g2 = new THREE.BufferGeometry().setFromPoints([V(p[0] - tick[0], p[1] - tick[1], p[2] - tick[2]), V(p[0] + tick[0], p[1] + tick[1], p[2] + tick[2])]);
+        var tl = new THREE.Line(g2, lineMat); tl.renderOrder = 19; grp.add(tl);
+      });
+      var sp = label(txt);
+      sp.position.copy(V((a[0] + b[0]) / 2 + lo[0], (a[1] + b[1]) / 2 + lo[1], (a[2] + b[2]) / 2 + lo[2]));
+      grp.add(sp);
+    }
+    var gd = { stand: new THREE.Group(), plate: new THREE.Group(), pedal: new THREE.Group() };
+    var X = [4, 0, 0], Y = [0, 4, 0], Z = [0, 0, 4];
+    // holder
+    dim(gd.stand, [-75.2, 174, 0], [75.2, 174, 0], 'Bredde 150,4', Y, [0, 0, 9]);
+    dim(gd.stand, [-86, -16, 0], [-86, 166, 0], 'Lengde 182', X, [-3, 0, 9]);
+    dim(gd.stand, [84, 166, 0], [84, 166, 37.6], 'Høyde 37,6', X, [14, 0, 0]);
+    dim(gd.stand, [-70.25, 90, 44], [70.25, 90, 44], 'Innvendig 140,5', Y, [0, 0, 9]);
+    dim(gd.stand, [0, 156, 0], [0, 156, 6], 'Støttepinne 6', Y, [0, 0, 9]);
+    // hælplate
+    dim(gd.plate, [-75.2, -203, 0], [75.2, -203, 0], 'Bredde 150,4', Y, [0, 0, 9]);
+    dim(gd.plate, [-86, -196, 0], [-86, -6, 0], 'Lengde 190', X, [-3, 0, 9]);
+    dim(gd.plate, [84, -196, 0], [84, -196, 19], 'Høyde 19', X, [14, 0, 0]);
+    // pedal
+    dim(gd.pedal, [-70, -9, 0], [70, -9, 0], 'Bredde 140', Y, [0, 0, 9]);
+    dim(gd.pedal, [92, 0, 0], [92, 160, 0], 'Lengde 160', X, [3, 0, 9]);
+    dim(gd.pedal, [94, 160, 0], [94, 160, 39], 'Høyde bak 39', X, [14, 0, 0]);
+    gd.stand.visible = gd.plate.visible = gd.pedal.visible = false;
+    gStand.add(gd.stand); gPlate.add(gd.plate); gPedal.add(gd.pedal);
+    var db = document.getElementById('dims');
+    db.addEventListener('click', function () {
+      var on = db.getAttribute('aria-pressed') !== 'true';
+      db.setAttribute('aria-pressed', on ? 'true' : 'false');
+      gd.stand.visible = gd.plate.visible = gd.pedal.visible = on;
+    });
   })();
   root.add(gStand); root.add(gPlate); root.add(gPedal);
 
